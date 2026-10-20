@@ -7,6 +7,10 @@ TOPIC = {"en": re.compile(r"Taiwan|South China Sea|Philippin|Manila|Scarborough|
 QPAT = {"en": re.compile(r"^(Q:|Q：|[A-Z][\w .’'&\-]{1,60}(?:\:|：)\s?.*\?$)"), "zh": re.compile(r"^[^：:]{1,40}记者[：:]|^问[：:]")}
 APAT = {"en": re.compile(r"^(Spokesperson|Mao Ning|Lin Jian|Guo Jiakun|Wang Wenbin|Zhao Lijian|Hua Chunying|Wang Yi)\s*[:：]"),
         "zh": re.compile(r"^(毛宁|林剑|郭嘉昆|汪文斌|赵立坚|华春莹|发言人)[：:]")}
+# Non-speech website boilerplate scraped from mfa.gov.cn pages (exit-site popup, copyright/ICP footer). Filtered AFTER
+# sent_id assignment so existing ids (and the labels keyed on them) stay stable.
+JUNK = re.compile(r"即将离开外交部门户网站|版权所有|京ICP备|京公网安备|网站标识码")
+def is_junk(s): return bool(JUNK.search(str(s)))
 def paras(t):
     t = re.sub(r"<(script|style).*?</\1>", "", t, flags=re.S)
     return [p for p in (html.unescape(re.sub(r"<[^>]+>", "", x)).replace("\xa0", " ").strip() for x in re.findall(r"<p[^>]*>(.*?)</p>", t, re.S)) if p]
@@ -38,6 +42,7 @@ def main():
                     rows.append(dict(date=title_date(r.title, lang, r.date).date(), lang=lang, speaker=speaker, question=q[:400], sentence=s, url=r.url))
     df = pd.DataFrame(rows).drop_duplicates(["date", "lang", "sentence"]).reset_index(drop=True)
     df.insert(0, "sent_id", [f"{l}{i:06d}" for i, l in zip(df.index, df.lang)])
+    df = df[~df.sentence.map(is_junk)]
     df.to_csv(ROOT / "data/processed/mfa_sentences.csv", index=False)
     print(df.groupby("lang").agg(n=("sentence", "size"), start=("date", "min"), end=("date", "max"), days=("date", "nunique")))
 if __name__ == "__main__":

@@ -6,3 +6,6 @@ __pycache__/
 data/raw/*
 !data/raw/coercion_events_curated.csv
 !data/raw/.gitkeep
+
+# review spreadsheets (CSV export data/labels/ai2_labeled_raw.csv is committed)
+data/labels/*.xlsx

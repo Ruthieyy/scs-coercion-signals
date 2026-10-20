@@ -48,26 +48,26 @@ The results are consistent with coercion being **calibrated to be loud but cheap
 ## M3: text-derived signals (details: `reports/results_M3_text_signals.md`, `reports/classifier_metrics.md`, `reports/figures/fig02_text_signals.png`)
 
 **Data.**
-- MFA press conferences: EN 1,000 and ZH 998 transcripts. Coverage starts 2022-07, because the public listing does not reach earlier. Segmentation gives 9,482 EN and 7,629 ZH spokesperson-answer sentences on the Taiwan/SCS topic set.
+- MFA press conferences: EN 1,000 and ZH 998 transcripts. Coverage starts 2022-07, because the public listing does not reach earlier. Segmentation gives 9,482 EN and 7,341 ZH spokesperson-answer sentences on the Taiwan/SCS topic set (after dropping 288 rows of mfa.gov.cn website boilerplate: the exit-site popup and the copyright footer).
 - Taiwan MND PLA reports: 2,015 reports, 2020-09 → 2026-10, of which 1,368 days have aircraft counts.
 - China Coast Guard and Philippine Coast Guard sites block automated access. They were not collected.
 
 **Classifier.**
-- On 190 held-out sentences, the ensemble of TF-IDF + LR and multilingual MiniLM + LR reaches macro-F1 0.86: action F1 0.87, threat 0.80, neither 0.92.
-- The keyword rules reach 0.76. A model trained only on rule (silver) labels also reaches 0.75, so hand labelling beats keyword labelling.
-- Cross-lingual transfer works: trained on EN only and tested on ZH, F1 is 0.77.
-- All labels are AI-assistant labels, not human labels.
+- Labels come from two independent AI annotators: the Grok Bot research assistant (all 471 sentences) and a second AI model provided by the author (the 189 held-out test sentences). Inter-annotator agreement on the test set is Cohen's κ = 0.935 (183/189 identical); the 6 disagreements were resolved per codebook rules 5 and 8, using the second annotator's labels. **There is no human-annotated validation yet**; a human spot-check of 40 sentences is planned.
+- Evaluated against the second annotator's labels on the 189 held-out sentences (model chosen by CV on the training set only), the ensemble of TF-IDF + LR and multilingual MiniLM + LR reaches macro-F1 0.859 (κ 0.758): action F1 0.89, threat 0.77, neither 0.91. MiniLM alone reaches 0.797.
+- The keyword rules reach 0.73. A model trained only on rule (silver) labels reaches 0.75, so sentence-level labels beat keyword labelling.
+- Cross-lingual transfer works: trained on EN only and tested on ZH, macro-F1 is 0.76.
 
 **Signal validation (does the series move when it should?).**
 - MND aircraft counts are a strong signal for Taiwan military actions: the median z-score is 5.3 and 89% of events exceed z>2. They do not move for SCS events or for verbal threats.
 - MFA action-share rises around both Taiwan and SCS actions (42–45% exceed z>2). This makes sense, since the spokesperson describes the drills.
-- MFA threat-share responds only weakly to the curated threat events. Median z is 0.8, and z>2 occurs for 1 of 9 (2 of 9 for novel threats). Threat language peaks around Taiwan actions instead. The largest 10-presser peak is 2024-12-11, the period of Lai Ching-te's Hawaii/Guam transit and the large PLA maritime deployment in early December 2024. In this channel, threats accompany actions; they do not precede them as separate "warning" signals.
+- MFA threat-share responds only weakly to the curated threat events. Median z is 0.7, and z>2 occurs for 2 of 9 (also 2 of 9 for novel threats). Threat language peaks around Taiwan actions instead. The largest 10-presser peak is 2024-12-11, the period of Lai Ching-te's Hawaii/Guam transit and the large PLA maritime deployment in early December 2024. In this channel, threats accompany actions; they do not precede them as separate "warning" signals.
 - Caveat: there are only 9 curated threat events inside the MFA coverage window.
 
 **Cost side.**
-- Using signal-spike days (z>3, merged within 10 days) as events: MFA threat 20 spikes, novel threat 24, action 28, MND aircraft 29.
-- Abnormal weather-adjusted transits over days 0–14 lie between −3% and +2% at every chokepoint, with every placebo p ≥ 0.26.
-- Weekly lagged regressions of abnormal transits on the signal z-scores are also null: |β| ≤ 1.2% per SD and every p ≥ 0.29. MND aircraft vs. Taiwan Strait gave p = 0.35.
+- Using signal-spike days (z>3, merged within 10 days) as events: MFA threat 20 spikes, novel threat 26, action 29, MND aircraft 29.
+- Abnormal weather-adjusted transits over days 0–14 lie between −3% and +2% at every chokepoint, with every placebo p ≥ 0.27.
+- Weekly lagged regressions of abnormal transits on the signal z-scores are also null: |β| ≤ 1.0% per SD and every p ≥ 0.25. MND aircraft vs. Taiwan Strait gave p = 0.35.
 - This is consistent with M2: neither actions nor threats measurably reduce transits. The new text signals do not change that.
 
 **Interpretation (hypothesis).**
@@ -78,8 +78,8 @@ The results are consistent with coercion being **calibrated to be loud but cheap
   - coercion in this period was calibrated to stay below the level that disrupts commerce.
 
 **New caveats.**
-- Single AI annotator; no human check yet (`data/labels/for_human_review.csv` is ready).
-- Enriched test set, and the model was selected on that test set.
+- Two AI annotators, no human-annotated validation yet; a human spot-check of a stratified random 40-sentence subset (`data/labels/human_spotcheck_40.csv`) is planned.
+- Enriched test set (rule-flagged sentences oversampled). The model is now selected by CV on the training set, not on the test set.
 - The threat series is dominated by boilerplate formulas ("red line", "play with fire"). A version excluding them is reported as well.
 - No MFA data before 2022-07.
 - The MND format changes at 2022-11 (before that, SW-ADIZ incursions only). Counts are missing for 2024-01 to 2025-02, when they were published only as PDF or image attachments or the reports are missing.

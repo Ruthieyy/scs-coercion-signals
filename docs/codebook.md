@@ -31,8 +31,10 @@ Everything else:
 
 ## Label provenance (be honest)
 - `silver`: produced by a keyword/regex labeler (`src/label_rules.py`) that implements this codebook. These are noisy and are used only as weak training data.
-- `agent`: labeled one by one by the AI research assistant (Grok Bot), reading each sentence against this codebook. **These are not human labels.** They are the validation and test set for now, and are exported for human review in `data/labels/for_human_review.csv`.
-- `human`: reserved for labels confirmed or corrected by Yutong. Until then, every reported metric is **agreement with agent labels**.
+- `agent`: labeled one by one by the AI research assistant (Grok Bot), reading each sentence against this codebook. Not human labels. In `data/labels/agent_labeled.csv` the column `agent_label` always keeps this label.
+- `ai2`: labels from a **second, independent AI model** provided by the author, for the 190 held-out sentences in `data/labels/for_human_review.csv` (columns `ai2_label`, `ai2_note`; merged by `src/merge_ai2_labels.py`). Not human labels. Agreement with `agent`: Cohen's κ = 0.935 (184/190 identical; 183/189 after dropping one website-boilerplate row). All 6 disagreements were cases the agent labeled action/threat and ai2 labeled neither (fatalistic "doomed to fail", rule 5; recounted past red-line warnings, rule 8; asserting a right to countermeasures without an executed or announced measure, rules 2–4). They were resolved per these rules using the ai2 label, and `label` / `label_source` in `agent_labeled.csv` use ai2 where it exists. These 189 sentences are the evaluation reference.
+- `human`: reserved. **No human labels exist yet**; `human_label` / `human_note` in `for_human_review.csv` are deliberately empty. A human spot-check of a stratified random 40-sentence subset is planned (`data/labels/human_spotcheck_40.csv`). Until then every reported metric is agreement with an AI annotator.
+- Website boilerplate scraped from mfa.gov.cn (exit-site popup "您即将离开外交部门户网站…", copyright/ICP footer) is not speech; it is removed from the corpus by `segment_mfa.is_junk` (288 rows) and excluded from training and evaluation.
 
 ## Decision rules added while labeling (v1.1)
 5. Fatalistic predictions with no PRC-imposed cost ("doomed to fail", "a dead end", "will get nowhere", "自取灭亡") → **neither**.

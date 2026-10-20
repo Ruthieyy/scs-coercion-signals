@@ -15,7 +15,7 @@ Shipping data is used here as **one measurable lens on costs, not as the topic i
 Gray-zone coercion is designed to stay below the threshold of war, which makes its effects hard to measure. Policy debate often goes by headline intensity. This project asks whether the headlines track real-world costs. That links to the literature on costly signalling (Fearon 1997), geopolitical-risk indices (Caldara & Iacoviello 2022), and text-based conflict forecasting (Mueller & Rauh 2018). See `docs/literature_review.md`.
 
 ## Contribution (what ML adds)
-- **Signal measurement.** Build a coercion-event classifier for English and Chinese news and MFA/CCG statements, with an *act vs. threat* split in the style of Caldara–Iacoviello GPR. It starts from keyword timelines and moves to a fine-tuned transformer or LLM-assisted labelling with a human-validated gold set.
+- **Signal measurement.** Build a coercion-event classifier for English and Chinese news and MFA/CCG statements, with an *act vs. threat* split in the style of Caldara–Iacoviello GPR. It starts from keyword timelines and moves to a fine-tuned transformer or LLM-assisted labelling with a validated gold set (currently two independent AI annotators; human validation planned).
 - **Cost estimation.** Run event studies and local projections against placebo distributions, with weather/typhoon and seasonality controls. Later this moves to synthetic control or causal ML (double ML) for heterogeneous effects by incident type.
 - **Forecasting test.** Use walk-forward validation to test whether signal features improve out-of-sample prediction of traffic disruptions beyond weather and seasonality.
 
@@ -30,7 +30,7 @@ Gray-zone coercion is designed to stay below the threshold of war, which makes i
 | Open-Meteo marine (ERA5 ocean) | daily max wave height per strait | public, no key | `src/build_weather.py` |
 | China MFA regular press conferences (EN + ZH) | ~1,000 transcripts per language, **2022-07 → 2026-10** (the listing does not reach earlier) | public fmprc.gov.cn / mfa.gov.cn | `src/crawl_mfa.py`, `src/segment_mfa.py` |
 | Taiwan MND PLA activity reports | 2,015 reports, 2020-09 → 2026-10 (format break 2022-11; counts missing where only a PDF or image was published) | public mnd.gov.tw | `src/crawl_mnd.py` |
-| Labelled sentences | 473 MFA sentences, action / threat / neither, **AI-assistant labels, not human** | `docs/codebook.md` | `data/labels/` |
+| Labelled sentences | 471 MFA sentences, action / threat / neither, from **two independent AI annotators** (Grok Bot assistant on all 471; a second AI model provided by the author on the 189 test sentences; κ = 0.935). **No human-annotated validation yet.** | `docs/codebook.md` | `data/labels/` |
 | Not accessible | China Coast Guard (WAF block, HTTP 418) and Philippine Coast Guard (HTTP 403) sites; not circumvented | — | — |
 | Planned | AMTI tracker, GPR daily, freight/FX/equities | public | — |
 
@@ -56,15 +56,23 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 # M3 text signals
 .venv/bin/python src/crawl_mfa.py && .venv/bin/python src/segment_mfa.py   # MFA EN+ZH -> data/processed/mfa_sentences.csv
 .venv/bin/python src/crawl_mnd.py                # (--cached to reparse) -> data/processed/mnd_pla_daily.csv
-.venv/bin/python src/train_classifier.py         # needs data/labels/agent_labeled.csv -> reports/classifier_metrics.md
+.venv/bin/python src/merge_ai2_labels.py         # second-annotator labels -> for_human_review.csv (ai2_label) + agent_labeled.csv
+.venv/bin/python src/train_classifier.py         # train = agent labels, test = ai2 labels -> reports/classifier_metrics.md
 .venv/bin/python src/build_text_signals.py       # -> data/processed/text_signals_daily.csv
 .venv/bin/python src/event_study_text.py         # -> reports/results_M3_text_signals.md, figures/fig02_text_signals.png
 ```
+
+## Classifier at a glance
+- Test set: 189 held-out MFA sentences (EN 112, ZH 77). Training: 282 other sentences. Model chosen by 5-fold CV on the training set only.
+- TF-IDF + MiniLM ensemble vs. the second AI annotator: **macro-F1 0.859**, κ 0.758 (F1 action 0.89, threat 0.77, neither 0.91). MiniLM alone 0.797; keyword rules 0.733. Details: `reports/classifier_metrics.md`.
+- Agreement between the two AI annotators: Cohen's κ = 0.935 (183/189). The 6 disagreements were resolved per codebook rules 5 and 8, using the second annotator's labels.
+
+**Limitation: no human-annotated validation yet.** All labels come from AI annotators, so every metric is agreement with an AI reading of the codebook, and both annotators may share blind spots. A human spot-check of a stratified random 40-sentence subset (`data/labels/human_spotcheck_40.csv`) is planned.
 
 ## Roadmap
 - [x] M0: feasibility probe + literature review
 - [x] M1: aligned daily panel (PortWatch × GDELT × curated events), first event study + figure
 - [x] M2: 60 verified events with sources; weather/typhoon controls; event study v2
-- [x] M3: MFA EN/ZH and MND corpora; codebook; action/threat classifier (macro-F1 0.86 vs. agent labels); daily threat signal in the event study. **Still open:** human validation of labels, CCG/PCG statements, MFA before 2022-07
+- [x] M3: MFA EN/ZH and MND corpora; codebook; action/threat classifier (macro-F1 0.859 on 189 held-out sentences vs. a second independent AI annotator; see limitations); daily threat signal in the event study. **Still open:** human validation of labels (40-sentence spot-check planned), CCG/PCG statements, MFA before 2022-07
 - [ ] M4: cost estimation — local projections/synthetic control; extend costs beyond transits (freight rates, TWD/PHP FX, Taiwan equities)
 - [ ] M5: walk-forward forecasting test; write-up (blog post + short paper)
