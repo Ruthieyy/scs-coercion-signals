@@ -53,21 +53,25 @@ The results are consistent with coercion being **calibrated to be loud but cheap
 - China Coast Guard and Philippine Coast Guard sites block automated access. They were not collected.
 
 **Classifier.**
-- Labels come from two independent AI annotators: the Grok Bot research assistant (all 471 sentences) and a second AI model provided by the author (the 189 held-out test sentences). Inter-annotator agreement on the test set is Cohen's κ = 0.935 (183/189 identical); the 6 disagreements were resolved per codebook rules 5 and 8, using the second annotator's labels. **There is no human-annotated validation yet**; a human spot-check of 40 sentences is planned.
-- Evaluated against the second annotator's labels on the 189 held-out sentences (model chosen by CV on the training set only), the ensemble of TF-IDF + LR and multilingual MiniLM + LR reaches macro-F1 0.859 (κ 0.758): action F1 0.89, threat 0.77, neither 0.91. MiniLM alone reaches 0.797.
-- The keyword rules reach 0.73. A model trained only on rule (silver) labels reaches 0.75, so sentence-level labels beat keyword labelling.
-- Cross-lingual transfer works: trained on EN only and tested on ZH, macro-F1 is 0.76.
+- Iterative codebook validation:
+  1. Two independent AI annotators (the Grok Bot assistant on all 471 sentences; a second AI model provided by the author on the 189 held-out ones) agreed closely: κ = 0.935.
+  2. The author then hand-labeled (no AI) a stratified random 40-sentence subset. Initial human vs. AI agreement was only 26/40, **κ = 0.46**, so the AI–AI agreement had overstated label quality.
+  3. The author adjudicated the 14 disagreements (7 to the AI label, 6 kept, 1 third label flagged borderline) and revised the codebook to **v1.2**: rule 5 (threat needs addressee + targeted behaviour + adverse outcome, even if fatalistic) and new rule 10 (action only when a measure is announced or reported; justifying one already taken is neither).
+  4. The assistant re-applied v1.2 to all 471 sentences: 22 relabeled (16 action → neither, 5 neither → threat, 1 threat → neither). Final human vs. v1.2 AI labels on the 40: 38/40, κ = 0.92. This is optimistic, because v1.2 was written from these 40 sentences.
+- Against the author's hand labels on the 40 (model chosen by CV on the training set only), the TF-IDF + MiniLM ensemble reaches macro-F1 0.88 (κ 0.79): action F1 0.92, threat 0.83, neither 0.88. Small n and optimistic (see caveats).
+- Against v1.2 AI labels on all 189 held-out sentences: macro-F1 0.845 (κ 0.73); MiniLM alone 0.784; keyword rules 0.684; a model trained only on rule (silver) labels 0.779.
+- Cross-lingual transfer works: trained on EN only and tested on ZH, macro-F1 is 0.79.
 
 **Signal validation (does the series move when it should?).**
 - MND aircraft counts are a strong signal for Taiwan military actions: the median z-score is 5.3 and 89% of events exceed z>2. They do not move for SCS events or for verbal threats.
-- MFA action-share rises around both Taiwan and SCS actions (42–45% exceed z>2). This makes sense, since the spokesperson describes the drills.
-- MFA threat-share responds only weakly to the curated threat events. Median z is 0.7, and z>2 occurs for 2 of 9 (also 2 of 9 for novel threats). Threat language peaks around Taiwan actions instead. The largest 10-presser peak is 2024-12-11, the period of Lai Ching-te's Hawaii/Guam transit and the large PLA maritime deployment in early December 2024. In this channel, threats accompany actions; they do not precede them as separate "warning" signals.
+- MFA action-share rises around SCS actions (46% exceed z>2) but, under codebook v1.2, **no longer around Taiwan actions** (9%, median z 0.1; it was 45% under v1.1). Around Taiwan drills the spokesperson mostly *justifies* drills that the PLA Eastern Theater Command announced ("a firm punishment of…"), which v1.2 codes as neither. For SCS incidents the MFA itself reports the CCG measures. MND counts remain the action signal for Taiwan.
+- MFA threat-share responds only weakly to the curated threat events. Median z is 0.6, and z>2 occurs for 0 of 9 (also 0 of 9 for novel threats). Threat language peaks around Taiwan actions instead. The largest 10-presser peak is 2024-12-11, the period of Lai Ching-te's Hawaii/Guam transit and the large PLA maritime deployment in early December 2024. In this channel, threats accompany actions; they do not precede them as separate "warning" signals.
 - Caveat: there are only 9 curated threat events inside the MFA coverage window.
 
 **Cost side.**
-- Using signal-spike days (z>3, merged within 10 days) as events: MFA threat 20 spikes, novel threat 26, action 29, MND aircraft 29.
-- Abnormal weather-adjusted transits over days 0–14 lie between −3% and +2% at every chokepoint, with every placebo p ≥ 0.27.
-- Weekly lagged regressions of abnormal transits on the signal z-scores are also null: |β| ≤ 1.0% per SD and every p ≥ 0.25. MND aircraft vs. Taiwan Strait gave p = 0.35.
+- Using signal-spike days (z>3, merged within 10 days) as events: MFA threat 22 spikes, novel threat 25, action 32, MND aircraft 29.
+- Abnormal weather-adjusted transits over days 0–14 lie between −3.0% and +2.2% at every chokepoint, with every placebo p ≥ 0.14.
+- Weekly lagged regressions of abnormal transits on the signal z-scores are also null: |β| ≤ 0.9% per SD and every p ≥ 0.25. MND aircraft vs. Taiwan Strait gave p = 0.35.
 - This is consistent with M2: neither actions nor threats measurably reduce transits. The new text signals do not change that.
 
 **Interpretation (hypothesis).**
@@ -78,7 +82,7 @@ The results are consistent with coercion being **calibrated to be loud but cheap
   - coercion in this period was calibrated to stay below the level that disrupts commerce.
 
 **New caveats.**
-- Two AI annotators, no human-annotated validation yet; a human spot-check of a stratified random 40-sentence subset (`data/labels/human_spotcheck_40.csv`) is planned.
+- Human validation covers only 40 sentences by one annotator (the author), and codebook v1.2 was revised from those same 40, so the human-label metrics are optimistic. Training labels are AI labels under v1.2. A fresh human sample is needed.
 - Enriched test set (rule-flagged sentences oversampled). The model is now selected by CV on the training set, not on the test set.
 - The threat series is dominated by boilerplate formulas ("red line", "play with fire"). A version excluding them is reported as well.
 - No MFA data before 2022-07.
