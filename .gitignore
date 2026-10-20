@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+# large / re-fetchable raw data
+data/raw/*
+!data/raw/coercion_events_curated.csv
+!data/raw/.gitkeep

@@ -1,0 +1,17 @@
+event_id,start_date,end_date,theater,type,actor,description,verify_status
+E01,2022-08-04,2022-08-10,taiwan,military_exercise,PLA,Large-scale live-fire exercises around Taiwan after Pelosi visit,well_known
+E02,2023-04-08,2023-04-10,taiwan,military_exercise,PLA,"Joint Sword" exercises around Taiwan,well_known
+E03,2023-08-05,2023-08-05,scs_spratly,water_cannon,CCG,Water cannon vs Philippine resupply at Second Thomas Shoal,well_known
+E04,2023-10-22,2023-10-22,scs_spratly,collision,CCG/maritime militia,Collisions with Philippine resupply boat and PCG vessel near Second Thomas Shoal,well_known
+E05,2023-12-09,2023-12-10,scs_mixed,water_cannon,CCG,Water cannon at Scarborough (Dec 9) and Second Thomas Shoal (Dec 10),well_known
+E06,2024-03-05,2024-03-05,scs_spratly,water_cannon,CCG,Water cannon and collision at Second Thomas Shoal resupply,well_known
+E07,2024-03-23,2024-03-23,scs_spratly,water_cannon,CCG,Water cannon vs resupply boat at Second Thomas Shoal,well_known
+E08,2024-04-30,2024-04-30,scs_scarborough,water_cannon,CCG,Water cannon vs PCG/BFAR vessels at Scarborough Shoal,well_known
+E09,2024-05-23,2024-05-24,taiwan,military_exercise,PLA,"Joint Sword-2024A" after Lai inauguration,well_known
+E10,2024-06-17,2024-06-17,scs_spratly,boarding_clash,CCG,Boarding/clash with blades and axes at Second Thomas Shoal,well_known
+E11,2024-08-19,2024-08-31,scs_spratly,collision,CCG,Series of collisions with PCG vessels near Sabina Shoal (Aug 19/25/31),verify_dates
+E12,2024-10-14,2024-10-14,taiwan,military_exercise,PLA,"Joint Sword-2024B" one-day exercise,well_known
+E13,2024-12-04,2024-12-04,scs_scarborough,water_cannon,CCG,Water cannon vs BFAR vessel near Scarborough Shoal,verify_dates
+E14,2025-04-01,2025-04-02,taiwan,military_exercise,PLA/CCG,"Strait Thunder-2025A" exercises,well_known
+E15,2025-08-11,2025-08-11,scs_scarborough,collision,PLAN/CCG,PLAN destroyer collides with CCG cutter while chasing PCG vessel near Scarborough,verify_dates
+E16,2025-12-29,2025-12-30,taiwan,military_exercise,PLA,Large-scale PLA exercises around Taiwan (late Dec 2025),verify_dates

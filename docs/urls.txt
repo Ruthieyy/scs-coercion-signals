@@ -1,0 +1,14 @@
+https://www.ncei.noaa.gov/products/international-best-track-archive
+https://amti.csis.org/island-tracker/
+https://hub.marinecadastre.gov/pages/vesseltraffic
+https://www.aishub.net/join-us
+http://aisdata.ais.dk/
+https://globalfishingwatch.org/our-apis/
+https://www.gdeltproject.org/data.html
+https://acleddata.com/myacled-faqs
+https://portwatch.imf.org/pages/data-and-methodology
+https://www.ccg.gov.cn/
+https://marine-api.open-meteo.com/v1/marine?latitude=24&longitude=119.5&daily=wave_height_max&start_date=2025-10-20&end_date=2025-10-27
+https://data.gdeltproject.org/events/20251229.export.CSV.zip
+https://www.mfa.gov.cn/web/fyrbt_673021/
+https://www.kaggle.com/datasets?search=AIS
