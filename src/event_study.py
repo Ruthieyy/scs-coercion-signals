@@ -1,100 +1,117 @@
-"""Preliminary event study: (1) do GDELT text signals spike at curated coercion events?
-(2) do transits through nearby chokepoints show abnormal change after events, vs. a placebo
-distribution of random non-event dates?  PRELIMINARY - small N, no weather controls yet."""
+"""Event study v2 (M2): do GDELT text signals spike at curated coercion events (signal side), and do
+nearby chokepoint transits deviate after events, net of weather/seasonality (cost side)?
+Abnormal transits = residuals of log1p(transits) ~ day-of-week + month + year + waves(lag0-2)
++ tropical-cyclone proximity(lag0-3), fitted on non-event days. Event day 0 = public_date.
+Inference: placebo distribution of mean paths over random non-event dates. PRELIMINARY."""
+import warnings; warnings.filterwarnings("ignore")
 import pathlib, numpy as np, pandas as pd, matplotlib
 matplotlib.use("Agg"); import matplotlib.pyplot as plt
 import statsmodels.api as sm
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 P = pd.read_csv(ROOT / "data/processed/daily_panel.csv", index_col=0, parse_dates=True)
-EV = pd.read_csv(ROOT / "data/raw/coercion_events_curated.csv", parse_dates=["start_date", "end_date"])
+EV = pd.read_csv(ROOT / "data/raw/coercion_events_curated.csv", parse_dates=["event_date", "end_date", "public_date"])
 FIG = ROOT / "reports/figures"; FIG.mkdir(parents=True, exist_ok=True)
 rng = np.random.default_rng(42)
-PRE, WIN = (-28, -8), (-14, 21)
-POST = (0, 14)
+PRE, WIN, POST, NPL = (-28, -8), (-14, 21), (0, 14), 2000
+near_any = pd.Series(False, index=P.index)
+for d in EV.public_date:
+    near_any |= (P.index >= d - pd.Timedelta(days=14)) & (P.index <= d + pd.Timedelta(days=14))
 
-def smooth_log(s):  # 7-day centered mean of log -> removes day-of-week pattern
-    return np.log1p(s).rolling(7, center=True, min_periods=5).mean()
+def resid(strait, weather=True):
+    y = np.log1p(P[f"transits_{strait}"])
+    X = pd.get_dummies(pd.DataFrame({"dow": P.index.dayofweek, "m": P.index.month, "y": P.index.year}, index=P.index).astype(str),
+                       drop_first=True).astype(float)
+    if weather and f"wave_{strait}" in P:
+        for L in range(3): X[f"wave_l{L}"] = P[f"wave_{strait}"].shift(L)
+        for L in range(4): X[f"tc_l{L}"] = P[f"tc300_{strait}"].shift(L)
+        X["tcwind"] = P[f"tcwind500_{strait}"]
+    X = sm.add_constant(X); ok = X.notna().all(1) & y.notna()
+    m = sm.OLS(y[ok & ~near_any], X[ok & ~near_any]).fit()
+    r = (y - m.predict(X)).where(ok)
+    return r.rolling(7, center=True, min_periods=5).mean(), m.rsquared
 
-def path(series, d0):
-    idx = series.index.get_indexer([d0])[0]
-    if idx < -WIN[0] + 30 or idx + WIN[1] >= len(series): return None
-    seg = series.iloc[idx + WIN[0]: idx + WIN[1] + 1].values
-    base = series.iloc[idx + PRE[0]: idx + PRE[1] + 1].mean()
-    return seg - base
+def dedupe(dates, gap=10):
+    out = []
+    for d in sorted(dates):
+        if not out or (d - out[-1]).days > gap: out.append(d)
+    return out
 
-def study(col, dates, n_placebo=2000):
-    s = smooth_log(P[col])
-    paths = np.array([p for d in dates if (p := path(s, d)) is not None])
-    excl = pd.Series(False, index=s.index)
-    for d in EV.start_date:
-        excl |= (s.index >= d - pd.Timedelta(days=35)) & (s.index <= d + pd.Timedelta(days=35))
-    pool = s.index[~excl][40:-30]
-    k = len(paths)
-    plac = []  # distribution of the MEAN path across k random dates
-    for _ in range(n_placebo):
-        ps = [path(s, d) for d in rng.choice(pool, k, replace=False)]
-        plac.append(np.nanmean([p for p in ps if p is not None], axis=0))
-    plac = np.array(plac)
-    days = np.arange(WIN[0], WIN[1] + 1)
-    m = paths.mean(0)
-    post = (days >= POST[0]) & (days <= POST[1])
-    car, car_pl = m[post].mean(), plac[:, post].mean(1)
-    pval = (np.abs(car_pl) >= abs(car)).mean()
-    return days, m, plac, k, car, pval
+def path(s, d0):
+    if d0 not in s.index: return None
+    i = s.index.get_loc(d0)
+    if i + WIN[0] + PRE[0] < 0 or i + WIN[1] >= len(s): return None
+    seg = s.iloc[i + WIN[0]: i + WIN[1] + 1].values
+    base = s.iloc[i + PRE[0]: i + PRE[1] + 1].mean()
+    return None if np.isnan(base) else seg - base
 
-def signal_spike(col, dates):
+def study(s, dates):
+    paths = np.array([p for d in dates if (p := path(s, d)) is not None]); k = len(paths)
+    pool = s.index[~near_any][40:-30]
+    plac = np.array([np.nanmean([p for d in rng.choice(pool, k, replace=False) if (p := path(s, d)) is not None], axis=0) for _ in range(NPL)])
+    days = np.arange(WIN[0], WIN[1] + 1); post = (days >= POST[0]) & (days <= POST[1])
+    m = np.nanmean(paths, 0); car = np.nanmean(m[post]); cpl = np.nanmean(plac[:, post], 1)
+    pre_drift = np.nanmean(m[(days >= -7) & (days <= -1)])
+    return dict(days=days, m=m, plac=plac, k=k, car=car, p=(np.abs(cpl) >= abs(car)).mean(), pre=pre_drift, pool=len(pool))
+
+def grp(theater=None, cat=None, exclude=None):
+    e = EV
+    if theater: e = e[e.theater.isin(theater)]
+    if cat: e = e[e.category.eq(cat)]
+    return dedupe(e.public_date.tolist())
+
+G = {"TW actions": grp(["taiwan"], "action"), "PH-SCS actions": grp(["scs_ph"], "action"),
+     "All threats": grp(None, "threat"), "All SCS actions (excl. TW)": grp(["scs_ph", "scs_paracel", "scs_south"], "action")}
+SPECS = [("taiwan_strait", "TW actions"), ("luzon_strait", "TW actions"), ("taiwan_strait", "All threats"),
+         ("balabac_strait", "PH-SCS actions"), ("mindoro_strait", "PH-SCS actions"), ("mindoro_strait", "All threats"),
+         ("malacca_strait", "All SCS actions (excl. TW)")]
+L = ["# Preliminary results v2 (auto-generated by src/event_study.py)\n",
+     f"Events: {len(EV)} curated ({(EV.category=='action').sum()} actions, {(EV.category=='threat').sum()} threats), day 0 = public_date; events within 10 days of each other in a group are merged.",
+     f"Abnormal transits = residual of log1p(transits) on DOW+month+year FE + ERA5 max wave height (lags 0-2) + IBTrACS TC within 300 km (lags 0-3) + max TC wind within 500 km; fitted on days >14 d from any event. 7-day smoothed.",
+     f"Window {WIN}, baseline {PRE}, effect = mean over days {POST}. Placebo: {NPL} draws of the mean path over random non-event dates.\n",
+     "## Cost side: abnormal transits\n",
+     "| chokepoint | event group | N | effect, weather-adj. | placebo p | pre-trend (d-7..-1) | effect, no weather adj. | p (no adj.) |", "|---|---|---|---|---|---|---|---|"]
+RES = {}
+for strait, g in SPECS:
+    s1, r2w = resid(strait, True); s0, r20 = resid(strait, False)
+    a, b = study(s1, G[g]), study(s0, G[g]); RES[(strait, g)] = (a, b)
+    f = lambda x: f"{100*(np.exp(x)-1):+.1f}%"
+    L.append(f"| {strait} | {g} | {a['k']} | {f(a['car'])} | {a['p']:.2f} | {f(a['pre'])} | {f(b['car'])} | {b['p']:.2f} |")
+L.append("\nWeather model fit (R², non-event days): " + ", ".join(f"{s}: {resid(s, False)[1]:.2f}→{resid(s, True)[1]:.2f}" for s in ["taiwan_strait", "luzon_strait", "balabac_strait", "mindoro_strait", "malacca_strait"]))
+L.append("\n## Signal side: GDELT max z-score within 0..+2 days of public_date (vs trailing 90 d)\n")
+def zs(col, dates):
     s = P[col]; z = (s - s.rolling(90, min_periods=30).median().shift(7)) / s.rolling(90, min_periods=30).std().shift(7)
-    return pd.Series({d.date(): z.loc[d: d + pd.Timedelta(days=2)].max() for d in dates if d in z.index})
+    return pd.Series({d: z.loc[d: d + pd.Timedelta(days=2)].max() for d in dates if d in z.index and d <= z.dropna().index.max()})
+for col, g in [("gdelt_taiwan_drills", "TW actions"), ("gdelt_shoal_standoff", "PH-SCS actions"), ("gdelt_china_warns_scs", "All threats"), ("gdelt_china_warns_scs", "TW actions")]:
+    z = zs(col, G[g]).dropna()
+    L.append(f"- {col} @ {g}: median z = {z.median():.1f}; z>3 in {(z>3).sum()}/{len(z)}")
+L.append("\n## Lagged weekly regression (HAC SE): weekly mean abnormal transits(t+1) ~ signal z(t)\n")
+for strait, x in [("taiwan_strait", "gdelt_taiwan_drills"), ("balabac_strait", "gdelt_shoal_standoff"), ("mindoro_strait", "gdelt_shoal_standoff")]:
+    r = resid(strait, True)[0]; W = pd.DataFrame({"r": r, "x": P[x]}).resample("W").mean().iloc[1:-1]
+    xz = (W.x - W.x.rolling(26, min_periods=8).mean()) / W.x.rolling(26, min_periods=8).std()
+    d = pd.concat([W.r.shift(-1), xz], axis=1, keys=["y", "x"]).dropna()
+    m = sm.OLS(d.y, sm.add_constant(d.x)).fit(cov_type="HAC", cov_kwds={"maxlags": 4})
+    L.append(f"- {strait} ~ {x}: beta={m.params.x:+.4f}, p={m.pvalues.x:.2f}, R2={m.rsquared:.3f}, weeks={len(d)}")
+(ROOT / "reports/preliminary_results.md").write_text("\n".join(L) + "\n"); print("\n".join(L))
 
-tw = EV[EV.theater == "taiwan"].start_date.tolist()
-scs = EV[EV.theater.str.startswith("scs")].start_date.tolist()
-lines = ["# Preliminary results (auto-generated by src/event_study.py)\n",
-         f"Window {WIN}, baseline {PRE}, post-window mean over days {POST}; log transits, 7-day smoothed; placebo = 2000 draws of random non-event dates (>=35d from any event).\n"]
-res = {}
-specs = [("transits_taiwan_strait", tw, "Taiwan Strait | Taiwan drills"),
-         ("transits_luzon_strait", tw, "Luzon Strait | Taiwan drills"),
-         ("transits_balabac_strait", scs, "Balabac Strait | SCS CCG incidents"),
-         ("transits_mindoro_strait", scs, "Mindoro Strait | SCS CCG incidents"),
-         ("transits_malacca_strait", scs, "Malacca (far control) | SCS incidents")]
-lines.append("\n## Cost side: abnormal transits\n| chokepoint / events | N | mean post-event log change | approx % | placebo two-sided p |\n|---|---|---|---|---|")
-for col, d, lab in specs:
-    r = study(col, d); res[lab] = r
-    lines.append(f"| {lab} | {r[3]} | {r[4]:+.3f} | {100*(np.exp(r[4])-1):+.1f}% | {r[5]:.2f} |")
-lines.append("\n## Signal side: GDELT max z-score within 0..+2 days of event (vs trailing 90d)\n")
-for col, d in [("gdelt_taiwan_drills", tw), ("gdelt_shoal_standoff", scs), ("gdelt_china_warns_scs", tw + scs)]:
-    z = signal_spike(col, d)
-    lines.append(f"- {col}: median z = {z.median():.1f}; events with z>3: {(z>3).sum()}/{len(z)}")
-# lagged weekly regression: does a text signal this week predict next week's transit deviation?
-lines.append("\n## Lagged weekly regression (HAC SE): Δlog transits(t+1) ~ signal z(t)\n")
-W = P.resample("W").agg({"transits_taiwan_strait": "sum", "transits_balabac_strait": "sum",
-                         "gdelt_taiwan_drills": "mean", "gdelt_shoal_standoff": "mean"}).iloc[1:-1]
-for y, x in [("transits_taiwan_strait", "gdelt_taiwan_drills"), ("transits_balabac_strait", "gdelt_shoal_standoff")]:
-    dy = np.log(W[y]).diff().shift(-1)
-    xz = (W[x] - W[x].rolling(26, min_periods=8).mean()) / W[x].rolling(26, min_periods=8).std()
-    d = pd.concat([dy, xz], axis=1, keys=["dy", "x"]).dropna()
-    m = sm.OLS(d.dy, sm.add_constant(d.x)).fit(cov_type="HAC", cov_kwds={"maxlags": 4})
-    lines.append(f"- {y} ~ {x}: beta={m.params.x:+.4f}, p={m.pvalues.x:.2f}, R2={m.rsquared:.3f}, weeks={len(d)}")
-(ROOT / "reports/preliminary_results.md").write_text("\n".join(lines) + "\n")
-print("\n".join(lines))
-
-# ---- figure
-fig = plt.figure(figsize=(13, 8.5)); gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.1])
+# ---------- figure
+fig = plt.figure(figsize=(14, 11)); gs = fig.add_gridspec(3, 2, height_ratios=[1, 1, 1])
 ax = fig.add_subplot(gs[0, :])
 for col, c, lab in [("gdelt_taiwan_drills", "tab:red", "GDELT: Taiwan Strait drills/blockade"),
-                    ("gdelt_shoal_standoff", "tab:blue", "GDELT: Second Thomas/Scarborough/Sabina Shoal")]:
+                    ("gdelt_shoal_standoff", "tab:blue", "GDELT: Second Thomas/Scarborough/Sabina")]:
     ax.plot(P[col].rolling(7).mean(), color=c, lw=1, label=lab)
 for _, r in EV.iterrows():
-    ax.axvline(r.start_date, color="tab:red" if r.theater == "taiwan" else "tab:blue", ls=":", alpha=.6, lw=1)
-ax.set_yscale("symlog", linthresh=10); ax.set_ylabel("articles per 100k (7d avg, symlog)"); ax.legend(loc="upper left", fontsize=9)
-ax.set_title("Signal: news volume of coercion-related coverage; dotted lines = curated events (red Taiwan, blue SCS)")
-for i, lab in enumerate(["Taiwan Strait | Taiwan drills", "Balabac Strait | SCS CCG incidents"]):
-    days, m, plac, k, car, p = res[lab]; a = fig.add_subplot(gs[1, i])
-    lo, hi = np.percentile(plac, [2.5, 97.5], axis=0)
-    a.fill_between(days, 100*lo, 100*hi, color="grey", alpha=.3, label="95% placebo band")
-    a.plot(days, 100*m, color="k", lw=2, label=f"mean of {k} events")
-    a.axvline(0, color="r", ls="--"); a.axhline(0, color="grey", lw=.5)
-    a.set_title(f"Cost: {lab}\npost 0..14d ≈ {100*(np.exp(car)-1):+.1f}%, placebo p={p:.2f}", fontsize=10)
-    a.set_xlabel("days relative to event start"); a.set_ylabel("% vs pre-event baseline"); a.legend(fontsize=8)
-fig.suptitle("PRELIMINARY — Signals vs. costs of coercion in the South China Sea (no weather controls; small N)", fontweight="bold")
-fig.tight_layout(); fig.savefig(FIG / "fig01_signals_vs_costs.png", dpi=130)
-print("saved")
+    ax.axvline(r.public_date, color="tab:red" if r.theater == "taiwan" else "tab:blue",
+               ls="-" if r.category == "action" else "--", alpha=.35, lw=.8)
+ax.set_yscale("symlog", linthresh=10); ax.set_ylabel("articles per 100k (7d avg)")
+ax.legend(loc="upper left", fontsize=8); ax.set_title(f"Signal: news volume; vertical lines = {len(EV)} curated events (solid action / dashed threat; red Taiwan, blue SCS)", fontsize=10)
+for i, key in enumerate([("taiwan_strait", "TW actions"), ("luzon_strait", "TW actions"), ("balabac_strait", "PH-SCS actions"), ("mindoro_strait", "PH-SCS actions")]):
+    a, b = RES[key]; axx = fig.add_subplot(gs[1 + i // 2, i % 2])
+    lo, hi = np.percentile(a["plac"], [2.5, 97.5], axis=0)
+    axx.fill_between(a["days"], 100*lo, 100*hi, color="grey", alpha=.3, label="95% placebo band")
+    axx.plot(a["days"], 100*a["m"], "k", lw=2, label=f"weather-adjusted, N={a['k']}")
+    axx.plot(b["days"], 100*b["m"], color="tab:orange", lw=1, ls="--", label="no weather adj.")
+    axx.axvline(0, color="r", ls="--"); axx.axhline(0, color="grey", lw=.5)
+    axx.set_title(f"Cost: {key[0]} | {key[1]}: 0..14d {100*(np.exp(a['car'])-1):+.1f}% (p={a['p']:.2f})", fontsize=10)
+    axx.set_xlabel("days relative to public report"); axx.set_ylabel("% abnormal transits"); axx.legend(fontsize=7)
+fig.suptitle("PRELIMINARY v2 — Signals vs. costs of coercion (60 verified events, weather-adjusted)", fontweight="bold")
+fig.tight_layout(); fig.savefig(FIG / "fig01_signals_vs_costs.png", dpi=130); print("saved")

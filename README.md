@@ -25,8 +25,10 @@ Gray-zone coercion is designed to stay below the threshold of war, which makes i
 | IMF PortWatch `Daily_Chokepoints_Data` | daily transits by ship type, 8 SE-Asian chokepoints, 2019–2026 | public ArcGIS REST | `src/fetch_portwatch.py` |
 | GDELT DOC 2.0 API | daily article-volume timelines for coercion queries | public, 1 req/5 s | `src/fetch_gdelt_signals.py` |
 | GDELT 1.0 events | daily CAMEO-coded events (probe file) | public | probe only |
-| Curated incident list | 16 major PLA/CCG coercive episodes, 2022–2025 | hand-built, **dates need source verification** | `data/raw/coercion_events_curated.csv` |
-| Planned | Open-Meteo marine, IBTrACS typhoons, AMTI tracker, MFA press conferences, GPR daily | public | — |
+| Curated event list | 60 verified PRC coercion events 2019–2026 (48 actions / 12 threats), with source URLs | hand-built, see `docs/event_verification.md` | `src/events_master.py` → `data/raw/coercion_events_curated.csv` |
+| IBTrACS WP v04r01 | tropical-cyclone tracks → TC proximity per strait | public (NOAA NCEI) | `src/build_weather.py` |
+| Open-Meteo marine (ERA5 ocean) | daily max wave height per strait | public, no key | `src/build_weather.py` |
+| Planned | AMTI tracker, Taiwan MND daily PLA reports, MFA press conferences, GPR daily, freight/FX/equities | public | — |
 
 ## Repo layout
 ```
@@ -43,6 +45,8 @@ docs/                probe notes, literature review, source URLs
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python src/fetch_portwatch.py
 .venv/bin/python src/fetch_gdelt_signals.py      # slow: rate-limited
+.venv/bin/python src/events_master.py            # writes curated event CSV
+.venv/bin/python src/build_weather.py            # IBTrACS + ERA5 waves
 .venv/bin/python src/build_dataset.py
 .venv/bin/python src/event_study.py              # -> reports/preliminary_results.md, reports/figures/
 ```
@@ -50,7 +54,7 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 ## Roadmap
 - [x] M0: feasibility probe + literature review
 - [x] M1: aligned daily panel (PortWatch × GDELT × curated events), first event study + figure
-- [ ] M2: verify event dates against primary sources; expand to ~50+ incidents (AMTI, PCG statements); add weather/typhoon controls
+- [x] M2: 60 verified events with sources; weather/typhoon controls; event study v2
 - [ ] M3: text classifier for coercion acts vs. threats (EN + ZH, incl. MFA/CCG statements); gold-labelled validation set
 - [ ] M4: cost estimation — local projections/synthetic control; extend costs beyond transits (freight rates, TWD/PHP FX, Taiwan equities)
 - [ ] M5: walk-forward forecasting test; write-up (blog post + short paper)
