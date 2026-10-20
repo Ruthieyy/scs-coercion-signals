@@ -1,4 +1,4 @@
-# Findings note — PRELIMINARY (updated 2026-10-19, M2)
+# Findings note — PRELIMINARY (updated 2026-10-19, M3)
 
 **Bottom line (unchanged, now on firmer footing):** the news *signal* of coercion is clear for major military exercises and weaker for coast-guard incidents. After weather adjustment and with 60 verified events, there is **still no credible evidence of a traffic *cost*** at nearby chokepoints. The one "significant" result (Luzon) is a pre-trend, not an effect. The M1 Balabac −7% result **did not survive** the larger sample.
 
@@ -43,3 +43,44 @@ The results are consistent with coercion being **calibrated to be loud but cheap
 - AIS coverage gaps are possible.
 - The CCG water-cannon GDELT query is still missing because the API kept rate-limiting it.
 - The list over-represents English-language and Philippine-publicised events.
+
+---
+## M3: text-derived signals (details: `reports/results_M3_text_signals.md`, `reports/classifier_metrics.md`, `reports/figures/fig02_text_signals.png`)
+
+**Data.**
+- MFA press conferences: EN 1,000 and ZH 998 transcripts. Coverage starts 2022-07, because the public listing does not reach earlier. Segmentation gives 9,482 EN and 7,629 ZH spokesperson-answer sentences on the Taiwan/SCS topic set.
+- Taiwan MND PLA reports: 2,015 reports, 2020-09 → 2026-10, of which 1,368 days have aircraft counts.
+- China Coast Guard and Philippine Coast Guard sites block automated access. They were not collected.
+
+**Classifier.**
+- On 190 held-out sentences, the ensemble of TF-IDF + LR and multilingual MiniLM + LR reaches macro-F1 0.86: action F1 0.87, threat 0.80, neither 0.92.
+- The keyword rules reach 0.76. A model trained only on rule (silver) labels also reaches 0.75, so hand labelling beats keyword labelling.
+- Cross-lingual transfer works: trained on EN only and tested on ZH, F1 is 0.77.
+- All labels are AI-assistant labels, not human labels.
+
+**Signal validation (does the series move when it should?).**
+- MND aircraft counts are a strong signal for Taiwan military actions: the median z-score is 5.3 and 89% of events exceed z>2. They do not move for SCS events or for verbal threats.
+- MFA action-share rises around both Taiwan and SCS actions (42–45% exceed z>2). This makes sense, since the spokesperson describes the drills.
+- MFA threat-share responds only weakly to the curated threat events. Median z is 0.8, and z>2 occurs for 1 of 9 (2 of 9 for novel threats). Threat language peaks around Taiwan actions instead. The largest 10-presser peak is 2024-12-11, the period of Lai Ching-te's Hawaii/Guam transit and the large PLA maritime deployment in early December 2024. In this channel, threats accompany actions; they do not precede them as separate "warning" signals.
+- Caveat: there are only 9 curated threat events inside the MFA coverage window.
+
+**Cost side.**
+- Using signal-spike days (z>3, merged within 10 days) as events: MFA threat 20 spikes, novel threat 24, action 28, MND aircraft 29.
+- Abnormal weather-adjusted transits over days 0–14 lie between −3% and +2% at every chokepoint, with every placebo p ≥ 0.26.
+- Weekly lagged regressions of abnormal transits on the signal z-scores are also null: |β| ≤ 1.2% per SD and every p ≥ 0.29. MND aircraft vs. Taiwan Strait gave p = 0.35.
+- This is consistent with M2: neither actions nor threats measurably reduce transits. The new text signals do not change that.
+
+**Interpretation (hypothesis).**
+- The text signals measure the signal side much better than GDELT volume. MND tracks actions and the MFA classifier separates action talk from threat talk.
+- On the cost side, the null result is now robust across three signal definitions.
+- Two readings remain:
+  - transits are the wrong cost measure (try freight rates, insurance, FX or equities in M4);
+  - coercion in this period was calibrated to stay below the level that disrupts commerce.
+
+**New caveats.**
+- Single AI annotator; no human check yet (`data/labels/for_human_review.csv` is ready).
+- Enriched test set, and the model was selected on that test set.
+- The threat series is dominated by boilerplate formulas ("red line", "play with fire"). A version excluding them is reported as well.
+- No MFA data before 2022-07.
+- The MND format changes at 2022-11 (before that, SW-ADIZ incursions only). Counts are missing for 2024-01 to 2025-02, when they were published only as PDF or image attachments or the reports are missing.
+- No transformer fine-tuning.

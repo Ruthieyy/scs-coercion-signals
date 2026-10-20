@@ -28,7 +28,11 @@ Gray-zone coercion is designed to stay below the threshold of war, which makes i
 | Curated event list | 60 verified PRC coercion events 2019–2026 (48 actions / 12 threats), with source URLs | hand-built, see `docs/event_verification.md` | `src/events_master.py` → `data/raw/coercion_events_curated.csv` |
 | IBTrACS WP v04r01 | tropical-cyclone tracks → TC proximity per strait | public (NOAA NCEI) | `src/build_weather.py` |
 | Open-Meteo marine (ERA5 ocean) | daily max wave height per strait | public, no key | `src/build_weather.py` |
-| Planned | AMTI tracker, Taiwan MND daily PLA reports, MFA press conferences, GPR daily, freight/FX/equities | public | — |
+| China MFA regular press conferences (EN + ZH) | ~1,000 transcripts per language, **2022-07 → 2026-10** (the listing does not reach earlier) | public fmprc.gov.cn / mfa.gov.cn | `src/crawl_mfa.py`, `src/segment_mfa.py` |
+| Taiwan MND PLA activity reports | 2,015 reports, 2020-09 → 2026-10 (format break 2022-11; counts missing where only a PDF or image was published) | public mnd.gov.tw | `src/crawl_mnd.py` |
+| Labelled sentences | 473 MFA sentences, action / threat / neither, **AI-assistant labels, not human** | `docs/codebook.md` | `data/labels/` |
+| Not accessible | China Coast Guard (WAF block, HTTP 418) and Philippine Coast Guard (HTTP 403) sites; not circumvented | — | — |
+| Planned | AMTI tracker, GPR daily, freight/FX/equities | public | — |
 
 ## Repo layout
 ```
@@ -49,12 +53,18 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python src/build_weather.py            # IBTrACS + ERA5 waves
 .venv/bin/python src/build_dataset.py
 .venv/bin/python src/event_study.py              # -> reports/preliminary_results.md, reports/figures/
+# M3 text signals
+.venv/bin/python src/crawl_mfa.py && .venv/bin/python src/segment_mfa.py   # MFA EN+ZH -> data/processed/mfa_sentences.csv
+.venv/bin/python src/crawl_mnd.py                # (--cached to reparse) -> data/processed/mnd_pla_daily.csv
+.venv/bin/python src/train_classifier.py         # needs data/labels/agent_labeled.csv -> reports/classifier_metrics.md
+.venv/bin/python src/build_text_signals.py       # -> data/processed/text_signals_daily.csv
+.venv/bin/python src/event_study_text.py         # -> reports/results_M3_text_signals.md, figures/fig02_text_signals.png
 ```
 
 ## Roadmap
 - [x] M0: feasibility probe + literature review
 - [x] M1: aligned daily panel (PortWatch × GDELT × curated events), first event study + figure
 - [x] M2: 60 verified events with sources; weather/typhoon controls; event study v2
-- [ ] M3: text classifier for coercion acts vs. threats (EN + ZH, incl. MFA/CCG statements); gold-labelled validation set
+- [x] M3: MFA EN/ZH and MND corpora; codebook; action/threat classifier (macro-F1 0.86 vs. agent labels); daily threat signal in the event study. **Still open:** human validation of labels, CCG/PCG statements, MFA before 2022-07
 - [ ] M4: cost estimation — local projections/synthetic control; extend costs beyond transits (freight rates, TWD/PHP FX, Taiwan equities)
 - [ ] M5: walk-forward forecasting test; write-up (blog post + short paper)
